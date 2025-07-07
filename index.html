@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Al-Qusayr MSNA – Demographics</title>
+  <!-- Include Chart.js from CDN:contentReference[oaicite:7]{index=7} -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; }
+    header { text-align: center; margin-bottom: 30px; }
+    h1 { color: #333; }
+    .charts-container { display: flex; flex-wrap: wrap; justify-content: space-around; }
+    .chart-box { background: #fff; border: 1px solid #ddd; border-radius: 5px;
+                 width: 45%; padding: 10px; margin: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .chart-box h2 { font-size: 1.2em; margin-bottom: 10px; text-align: center; color: #555; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Al-Qusayr MSNA – Demographic Indicators</h1>
+</header>
+
+<main class="charts-container">
+  <!-- Household Categories -->
+  <div class="chart-box">
+    <h2>Household Categories</h2>
+    <canvas id="householdChart"></canvas>
+  </div>
+
+  <!-- Population by Gender/Age -->
+  <div class="chart-box">
+    <h2>Population by Gender and Age</h2>
+    <canvas id="popGenderChart"></canvas>
+  </div>
+
+  <!-- Casualties (Martyrs vs Injured) -->
+  <div class="chart-box">
+    <h2>Casualties (Martyrs, Injured)</h2>
+    <canvas id="casualtiesChart"></canvas>
+  </div>
+
+  <!-- HH Size Distribution -->
+  <div class="chart-box">
+    <h2>Household Size Distribution</h2>
+    <canvas id="hhSizeChart"></canvas>
+  </div>
+
+  <!-- Continue adding sections for other indicators similarly... -->
+</main>
+
+<script>
+  const SHEET_ID = '16MPcuCSimsxl1AvEnOoLD8xJam944L-QNLiNBx6N3ds';
+  const baseQueryUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=`;
+
+  // Helper to fetch and parse Google Sheets JSON via Visualization API
+  async function fetchSheetData(sheetName, query='select *') {
+    const url = baseQueryUrl + encodeURIComponent(sheetName) + '&tq=' + encodeURIComponent(query);
+    const res = await fetch(url);
+    const text = await res.text();
+    // Strip the wrapper 'google.visualization.Query.setResponse(...)'
+    const json = JSON.parse(text.substr(47).slice(0, -2));
+    return json.table.rows;
+  }
+
+  // Draw charts with data from the sheet
+  async function drawCharts() {
+    // Household Categories (Pie Chart)
+    let rows = await fetchSheetData('HouseholdCategories');  // assume sheet name or range
+    let hhLabels = [], hhData = [];
+    rows.forEach(r => { hhLabels.push(r.c[0].v); hhData.push(+r.c[1].v); });
+    new Chart(document.getElementById('householdChart'), {
+      type: 'pie',
+      data: { labels: hhLabels, datasets: [{ data: hhData, backgroundColor: ['#66c2a5','#fc8d62','#8da0cb','#e78ac3'] }] },
+      options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    // Population by Gender and Age (Stacked Bar)
+    rows = await fetchSheetData('PopGenderAge');  // example sheet
+    let ageGroups = [], maleData = [], femaleData = [];
+    rows.forEach(r => {
+      ageGroups.push(r.c[0].v);
+      maleData.push(+r.c[1].v);
+      femaleData.push(+r.c[2].v);
+    });
+    new Chart(document.getElementById('popGenderChart'), {
+      type: 'bar',
+      data: { 
+        labels: ageGroups,
+        datasets: [
+          { label: 'Male', data: maleData, backgroundColor: '#66c2a5' },
+          { label: 'Female', data: femaleData, backgroundColor: '#fc8d62' }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+        plugins: { title: { display: false } }
+      }
+    });
+
+    // Casualties (Doughnut)
+    rows = await fetchSheetData('Casualties');  // sheet with Martyrs and Injured
+    let casualtyLabels = [], casualtyData = [];
+    rows.forEach(r => { casualtyLabels.push(r.c[0].v); casualtyData.push(+r.c[1].v); });
+    new Chart(document.getElementById('casualtiesChart'), {
+      type: 'doughnut',
+      data: { labels: casualtyLabels, datasets: [{ data: casualtyData, backgroundColor: ['#8da0cb','#e78ac3'] }] },
+      options: { responsive: true }
+    });
+
+    // HH Size Distribution (Bar)
+    rows = await fetchSheetData('HHSizeDist');
+    let sizeLabels = [], sizeData = [];
+    rows.forEach(r => { sizeLabels.push(r.c[0].v); sizeData.push(+r.c[1].v); });
+    new Chart(document.getElementById('hhSizeChart'), {
+      type: 'bar',
+      data: { labels: sizeLabels, datasets: [{ label: 'Households', data: sizeData, backgroundColor: '#66c2a5' }] },
+      options: { responsive: true, scales: { y: { beginAtZero: true } } }
+    });
+
+    // ... similarly fetch and draw charts for:
+    //   - Households with children <5
+    //   - People with disabilities by gender/age
+    //   - Orphans / unaccompanied children
+    //   - Income levels
+    //   - Vulnerable HH heads (elderly, single female, etc.)
+    //   - Pregnant / breastfeeding women
+    //   - Chronic disease cases
+    //
+    // Each chart is created with new Chart(ctx, {...}), using the fetched data arrays.
+  }
+
+  // Initial draw and auto-refresh every minute
+  drawCharts();
+  setInterval(drawCharts, 60000);  // refresh every 60 seconds
+
+</script>
+</body>
+</html>
